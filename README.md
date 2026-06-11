@@ -4,6 +4,27 @@ Interactive terminal directory navigator for fast `cd`.
 
 `u-tree` lets you move through folders with arrow keys, filter by typing, preview subfolders, and jump to shortcuts.
 
+## Compatibility
+
+`u-tree` is a Node.js command-line tool for interactive terminals.
+
+Currently intended for:
+
+- Linux
+- macOS
+- Bash or Zsh shell integration
+- Terminal emulators that support ANSI escape sequences and raw keyboard input
+
+Requirements:
+
+- Node.js 18+ recommended
+- npm, for `npm link` during development
+
+Notes:
+
+- Windows is not tested yet.
+- The raw CLI can run anywhere Node can run, but actual `cd` behavior requires a shell function in your current shell.
+
 ## Install for development
 
 From the repo folder, run:
