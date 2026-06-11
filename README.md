@@ -2,7 +2,7 @@
 
 Interactive terminal directory navigator for fast `cd`.
 
-`u-tree` lets you move through folders with arrow keys, filter by typing, preview subfolders, and jump to shortcuts.
+`u-tree` lets you move through folders with arrow keys, filter by typing, preview folders/files, and jump to shortcuts.
 
 ## Compatibility
 
@@ -49,14 +49,20 @@ This repo's `package.json` contains:
 
 ```json
 "bin": {
-  "u-tree": "bin/u-tree.js"
+  "u-tree": "bin/u-tree.js",
+  "tree": "bin/u-tree.js",
+  "cdu": "bin/u-tree.js"
 }
 ```
 
-So `npm link` creates a global `u-tree` command that points directly to `bin/u-tree.js` in this folder. That means you can edit the source file and immediately test the latest version by running:
+So `npm link` creates global `u-tree`, `tree`, and `cdu` commands that point directly to `bin/u-tree.js` in this folder. That means you can edit the source file and immediately test the latest version by running:
 
 ```bash
 u-tree
+# or
+tree
+# or
+cdu
 ```
 
 No rebuild or reinstall is needed during development.
@@ -81,6 +87,20 @@ u-tree() {
 utree() {
   u-tree "$@"
 }
+
+# Optional: use `tree` as the cd-enabled alias too.
+# This overrides the system `tree` command in your shell.
+tree() {
+  local dest
+  dest="$(command tree "$@")" || return
+  [ -n "$dest" ] && cd "$dest"
+}
+
+cdu() {
+  local dest
+  dest="$(command cdu "$@")" || return
+  [ -n "$dest" ] && cd "$dest"
+}
 ```
 
 Reload your shell:
@@ -98,6 +118,8 @@ u-tree
 u-tree .
 u-tree ~/Code
 utree
+tree
+cdu
 ```
 
 ## Options
@@ -111,12 +133,14 @@ utree
 Override startup settings:
 
 ```bash
-u-tree --preview
-u-tree --no-preview
+u-tree --preview     # start in folder-preview mode
+u-tree --no-preview  # start with preview off
 u-tree --hidden
 u-tree --no-hidden
 u-tree ~/Code --preview --no-hidden
 ```
+
+Press `Space` to cycle preview mode between off, folders, files, and both. In both mode, the preview pane is split under `FOLDERS` and `FILES` headings. When the selection is `.`, folder previews are suppressed so the right pane does not duplicate the current folder list.
 
 ## Keys
 
@@ -127,10 +151,10 @@ Common keys:
 - `↑` / `↓`: move selection
 - type text: filter folders by substring, case-insensitive
 - `.`: hide/show hidden folders
-- `Space`: toggle preview mode
+- `Space`: cycle preview mode: off, folders, files, both
 - `Insert`: add selected folder to shortcuts
 - `Home`: show/hide shortcut list
-- `→`: open selected folder
+- `→`: open selected folder, including empty folders
 - `←`: go up to parent folder
 - `Enter`: cd to selected folder and exit
 - `Esc` / `q`: quit, or return from help/shortcut screen
@@ -149,8 +173,7 @@ Shortcut list:
 
 - `.` means current folder
 - `..` means parent folder
-- Folders ending in `/` have subfolders
-- Folders without `/` have no subfolders
+- Folders always end in `/`
 - Matching filter substring is shown in gray
 
 ## Development

@@ -15,7 +15,7 @@ let filter = '';
 let showHidden = flags.has('--hidden') ? true : flags.has('--no-hidden') ? false : config.showHidden ?? true;
 let entries = [];
 let errorMessage = '';
-let previewMode = flags.has('--preview') ? true : flags.has('--no-preview') ? false : config.previewMode ?? false;
+let previewMode = flags.has('--preview') ? 'folders' : flags.has('--no-preview') ? 'none' : normalizePreviewMode(config.previewMode);
 let preview = null;
 let shortcutMode = false;
 let helpMode = false;
@@ -40,6 +40,16 @@ function saveConfig() {
   } catch {
     // Ignore config write failures; navigation should still work.
   }
+}
+
+function normalizePreviewMode(value) {
+  if (value === true) return 'folders';
+  if (value === false || value == null) return 'none';
+  return ['none', 'folders', 'files', 'both'].includes(value) ? value : 'none';
+}
+
+function previewModeLabel() {
+  return previewMode === 'none' ? 'off' : previewMode;
 }
 
 function shortcuts() {
@@ -94,17 +104,56 @@ function dirEntries(dir, useFilter = false) {
     .filter((d) => d.isDirectory())
     .filter((d) => showHidden || !d.name.startsWith('.'))
     .filter((d) => !needle || d.name.toLowerCase().includes(needle))
-    .map((d) => {
-      const fullPath = path.join(dir, d.name);
-      const hasChildren = hasChildDirs(fullPath);
-      return {
-        label: `${d.name}${hasChildren ? '/' : ''}`,
-        rawLabel: d.name,
-        path: fullPath,
-        hasChildren,
-      };
-    })
-    .sort((a, b) => a.rawLabel.localeCompare(b.rawLabel));
+    .map((d) => dirItem(dir, d))
+    .sort(compareItems);
+}
+
+function dirItem(dir, d) {
+  const fullPath = path.join(dir, d.name);
+  const hasChildren = hasChildDirs(fullPath);
+  return {
+    label: `${d.name}/`,
+    rawLabel: d.name,
+    path: fullPath,
+    hasChildren,
+    type: 'dir',
+  };
+}
+
+function fileItem(dir, d) {
+  return {
+    label: d.name,
+    rawLabel: d.name,
+    path: path.join(dir, d.name),
+    hasChildren: false,
+    type: 'file',
+  };
+}
+
+function compareItems(a, b) {
+  if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+  return a.rawLabel.localeCompare(b.rawLabel);
+}
+
+function previewEntries(entry) {
+  if (!entry || previewMode === 'none') return [];
+
+  const result = readDirSafe(entry.path);
+  const showDirs = entry.rawLabel !== '.' && (previewMode === 'folders' || previewMode === 'both');
+  const showFiles = previewMode === 'files' || previewMode === 'both';
+  const visible = result.entries.filter((d) => showHidden || !d.name.startsWith('.'));
+
+  if (previewMode === 'both') {
+    return {
+      folders: showDirs ? visible.filter((d) => d.isDirectory()).map((d) => dirItem(entry.path, d)).sort(compareItems) : [],
+      files: showFiles ? visible.filter((d) => d.isFile()).map((d) => fileItem(entry.path, d)).sort(compareItems) : [],
+    };
+  }
+
+  return visible
+    .filter((d) => (showDirs && d.isDirectory()) || (showFiles && d.isFile()))
+    .map((d) => d.isDirectory() ? dirItem(entry.path, d) : fileItem(entry.path, d))
+    .sort(compareItems);
 }
 
 function hasChildDirs(dir) {
@@ -162,17 +211,17 @@ function highlightFilter(entry) {
   const before = entry.rawLabel.slice(0, at);
   const hit = entry.rawLabel.slice(at, at + filter.length);
   const after = entry.rawLabel.slice(at + filter.length);
-  return `${before}\x1b[90m${hit}\x1b[0m${after}${entry.hasChildren ? '/' : ''}`;
+  return `${before}\x1b[90m${hit}\x1b[0m${after}${entry.type === 'dir' ? '/' : ''}`;
 }
 
 function updatePreview() {
-  if (!previewMode) {
+  if (previewMode === 'none') {
     preview = null;
     return;
   }
 
   const entry = entries[selectedIndex];
-  preview = entry ? { path: entry.path, entries: dirEntries(entry.path, false) } : null;
+  preview = entry ? { path: entry.path, mode: previewMode, entries: previewEntries(entry) } : null;
 }
 
 function render() {
@@ -193,7 +242,7 @@ function render() {
     process.stderr.write(`  type         filter folders, case-insensitive\n`);
     process.stderr.write(`  Backspace    edit filter; if empty, go up\n`);
     process.stderr.write(`  .            hide/show hidden folders\n`);
-    process.stderr.write(`  Space        toggle preview mode\n`);
+    process.stderr.write(`  Space        cycle preview mode: off, folders, files, both\n`);
     process.stderr.write(`  Insert       add selected folder to shortcuts\n`);
     process.stderr.write(`  Home         show/hide shortcut list\n`);
     process.stderr.write(`  →            open selected folder\n`);
@@ -232,7 +281,9 @@ function render() {
   } else if (entries.length === 0) {
     process.stderr.write('  (no folders)\n');
   } else {
-    for (let i = 0; i < Math.max(shown.length, preview?.entries.length || 0, 1, h); i++) {
+    const previewLines = preview ? previewDisplayLines(preview) : null;
+    const previewRows = previewLines?.length ?? 0;
+    for (let i = 0; i < Math.max(shown.length, previewRows, 1, h); i++) {
       if (i >= h) break;
       const realIndex = viewportTop + i;
       const item = shown[i];
@@ -248,8 +299,8 @@ function render() {
       }
 
       if (preview) {
-        const p = preview.entries[i];
-        const right = p ? fitAnsi(`  ${p.label}`, rightWidth) : ' '.repeat(rightWidth);
+        const line = previewLines[i];
+        const right = line ? fitAnsi(line, rightWidth) : ' '.repeat(rightWidth);
         process.stderr.write(`${left}  │${right}\n`);
       } else {
         process.stderr.write(`${left}\n`);
@@ -260,23 +311,37 @@ function render() {
   const moreTop = viewportTop > 0 ? '↑ more' : '';
   const moreBottom = viewportTop + h < entries.length ? '↓ more' : '';
   const more = [moreTop, moreBottom].filter(Boolean).join('  ');
-  const selected = entries[selectedIndex];
   const keys = [
-    '? help',
-    entries.length > 1 ? '↑/↓ move' : '',
-    'type filter',
-    filter ? 'Backspace edit' : 'Backspace up',
-    `. hidden ${showHidden ? 'shown' : 'hidden'}`,
-    'Space preview',
-    selected ? 'Ins shortcut' : '',
-    'Home shortcuts',
-    selected?.hasChildren ? '→ open' : '',
-    '← up',
-    'Enter cd',
-    'Esc/q quit',
+    '? ↑ ↓ → ← enter space home ins .',
+    showHidden ? 'showing hidden' : '',
     more,
-  ].filter(Boolean).join('  ');
+  ].filter(Boolean).join('   |   ');
   process.stderr.write(`\n${keys}\n`);
+}
+
+function previewDisplayLines(preview) {
+  if (preview.mode === 'both') return bothPreviewLines(preview.entries);
+
+  const headline = preview.mode === 'files' ? '  FILES' : '  FOLDERS';
+  const empty = preview.mode === 'files' ? '  (no files)' : '  (no folders)';
+  return [
+    headline,
+    '',
+    ...(preview.entries.length ? preview.entries.map((p) => `  ${p.label}`) : [empty]),
+  ];
+}
+
+function bothPreviewLines(entries) {
+  return [
+    '  FOLDERS',
+    '',
+    ...(entries.folders.length ? entries.folders.map((p) => `  ${p.label}`) : ['  (no folders)']),
+    '',
+    '',
+    '  FILES',
+    '',
+    ...(entries.files.length ? entries.files.map((p) => `  ${p.label}`) : ['  (no files)']),
+  ];
 }
 
 function cleanup() {
@@ -305,7 +370,8 @@ function beep() {
 }
 
 function togglePreviewMode() {
-  previewMode = !previewMode;
+  const modes = ['none', 'folders', 'files', 'both'];
+  previewMode = modes[(modes.indexOf(previewMode) + 1) % modes.length];
   saveConfig();
   updatePreview();
   render();
@@ -314,10 +380,6 @@ function togglePreviewMode() {
 function openSelected() {
   const entry = entries[selectedIndex];
   if (!entry) return;
-  if (!entry.hasChildren) {
-    beep();
-    return;
-  }
 
   const result = readDirSafe(entry.path);
   if (result.error) {

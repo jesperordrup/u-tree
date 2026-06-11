@@ -7,14 +7,16 @@ All notable changes to `u-tree` will be documented in this file.
 ### Added
 
 - Initial interactive `u-tree` CLI.
-- Directory navigation with arrow keys.
+- Directory navigation with arrow keys, including right-arrow navigation into empty folders.
 - `.` and `..` entries at the top of the folder list.
 - Default selection on `.`.
 - Type-to-filter folder list, case-insensitive.
 - `.` key toggles hidden folders.
 - Hidden-folder mode is remembered between sessions.
-- Space toggles persistent preview mode.
-- Preview mode shows selected folder's subfolders to the right.
+- Space cycles persistent preview mode between off, folders, files, and both.
+- Preview mode shows selected folder contents to the right.
+- Folders are always displayed with trailing `/`.
+- Folder previews are suppressed when selecting `.`.
 - Preview mode is remembered between sessions.
 - Insert adds selected folder to shortcuts.
 - Home opens shortcut list.
