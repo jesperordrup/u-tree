@@ -25,6 +25,16 @@ Notes:
 - Windows is not tested yet.
 - The raw CLI can run anywhere Node can run, but actual `cd` behavior requires a shell function in your current shell.
 
+## Install from npm
+
+After the package is published:
+
+```bash
+npm install -g u-tree
+```
+
+The GitHub release workflow publishes to npm when a GitHub release is published. The repo needs an `NPM_TOKEN` secret with publish permission.
+
 ## Install for development
 
 From the repo folder, run:
