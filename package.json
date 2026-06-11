@@ -1,0 +1,10 @@
+{
+  "name": "u-tree",
+  "version": "0.1.0",
+  "description": "Interactive terminal directory navigator for cd",
+  "bin": {
+    "u-tree": "bin/u-tree.js"
+  },
+  "type": "module",
+  "license": "MIT"
+}
