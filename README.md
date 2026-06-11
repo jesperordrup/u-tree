@@ -6,8 +6,34 @@ Interactive terminal directory navigator for fast `cd`.
 
 ## Install for development
 
+From the repo folder, run:
+
 ```bash
 npm link
+```
+
+`npm link` registers this local checkout as a global command on your machine.
+
+This repo's `package.json` contains:
+
+```json
+"bin": {
+  "u-tree": "bin/u-tree.js"
+}
+```
+
+So `npm link` creates a global `u-tree` command that points directly to `bin/u-tree.js` in this folder. That means you can edit the source file and immediately test the latest version by running:
+
+```bash
+u-tree
+```
+
+No rebuild or reinstall is needed during development.
+
+To remove the development link later:
+
+```bash
+npm unlink -g u-tree
 ```
 
 ## Shell setup
@@ -103,6 +129,24 @@ Syntax check:
 ```bash
 node --check bin/u-tree.js
 ```
+
+## Contributing
+
+Issues and pull requests are welcome.
+
+If you find a bug, have an idea, or want a new keybinding/behavior, please open an issue:
+
+```text
+https://github.com/jesperordrup/u-tree/issues
+```
+
+Pull requests are also welcome. For code changes, please run:
+
+```bash
+node --check bin/u-tree.js
+```
+
+before submitting.
 
 ## License
 
